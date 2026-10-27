@@ -6,10 +6,6 @@ branding:
   color: green
 
 inputs:
-  secrets:
-    description: 'Pass toJSON(secrets) from the stub. Only QUEST_* secrets are kept, and each one is masked.'
-    required: false
-    default: '{}'
   token:
     description: Token for check runs and PR comments. Needs checks and pull-requests write.
     required: false
@@ -74,7 +70,6 @@ runs:
     - name: Quest Log
       shell: bash
       env:
-        INPUT_SECRETS: ${{ inputs.secrets }}
         INPUT_TOKEN: ${{ inputs.token }}
         QUEST_CORE_PATH: ${{ steps.pointer.outputs.dir }}
         QUEST_CORE_VERSION: ${{ steps.pointer.outputs.version }}

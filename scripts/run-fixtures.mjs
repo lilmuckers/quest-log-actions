@@ -93,7 +93,8 @@ function runFixture(name, core) {
       QUEST_DRY_RUN_OUT: out,
       QUEST_BASE_REF: 'main',
       INPUT_TOKEN: 'unused-in-dry-run',
-      INPUT_SECRETS: JSON.stringify({ QUEST_FOO: SECRET, OTHER_BAR: 'not-kept', github_token: 'x' }),
+      QUEST_VAPID_PRIVATE_KEY: SECRET,
+      OTHER_BAR: 'not-kept',
     },
   });
   const log = r.stdout + r.stderr;
@@ -104,8 +105,9 @@ function runFixture(name, core) {
 
   const problems = [];
   const want = (cond, msg) => cond || problems.push(msg);
-  want(log.includes(`::add-mask::${SECRET}`), 'QUEST_FOO was not masked');
+  want(log.includes(`::add-mask::${SECRET}`), 'QUEST_VAPID_PRIVATE_KEY was not masked');
   want(!log.includes('::add-mask::not-kept'), 'OTHER_BAR was kept');
+  want(!log.includes(`::add-mask::${core.dir}`), 'an action setting (QUEST_CORE_PATH) was treated as a secret');
   want(status && status.event === expect.event && status.core.version === core.version, 'quest-status missing or wrong');
   if (expect.error) {
     want(r.status !== 0, `expected failure, exit ${r.status}`);
@@ -133,6 +135,7 @@ function checkStubContract(core) {
   const unknown = used.filter((k) => !inputs.includes(k));
   if (unknown.length) throw new Error(`stubSample passes inputs this action doesn't have: ${unknown.join(', ')}`);
   if (!/uses: lilmuckers\/quest-log-actions@(v1|main)/.test(sample)) throw new Error('stubSample does not use lilmuckers/quest-log-actions@v1 or @main');
+  if (/toJSON\(\s*secrets\s*\)/.test(sample)) throw new Error('stubSample passes toJSON(secrets); GitHub holds that for approval after every edit (D12). Name each secret as step env.');
   console.log(`✓ stub contract: ${used.join(', ') || 'no inputs'} all known`);
 }
 

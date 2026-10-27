@@ -38,16 +38,23 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: lilmuckers/quest-log-actions@v1
-        with:
-          secrets: ${{ toJSON(secrets) }}
+        env:
+          QUEST_VAPID_PRIVATE_KEY: ${{ secrets.QUEST_VAPID_PRIVATE_KEY }}
 ```
+
+Secrets are passed **by name**, never with `toJSON(secrets)`: GitHub holds a workflow that
+passes all secrets as "may be malicious" until someone approves it, and again after every edit.
+The stub lists every secret name the action knows, set or not; an unset one arrives empty and
+that feature stays off. A new secret name comes with a new stub version (`quest-stub: N`), which
+the app offers to write.
 
 ### Inputs
 
 | Input | Default | What it's for |
 |---|---|---|
-| `secrets` | `{}` | Pass `${{ toJSON(secrets) }}`. Only secrets named `QUEST_*` are kept, and each is masked in logs. |
 | `token` | `${{ github.token }}` | Writes the check run and the PR comment. |
+
+Secrets come in as step `env:` (see the stub), not as an input.
 
 On pull requests from forks GitHub passes no secrets and a read-only token. The action still
 validates, and reports problems as workflow annotations instead of a check run.
@@ -75,7 +82,8 @@ Optional. With no file, validate is on and everything else is off.
 |---|---|
 | `QUEST_VAPID_PRIVATE_KEY` | notify (`v1.1`); the app sets it the first time a device turns on push |
 
-Every other secret in the repo is ignored.
+The stub passes each one as step `env:`, and the action reads only these names (`SECRET_NAMES`
+in `src/secrets.ts`) and masks each value. Other secrets in the repo never reach it.
 
 ## Where the rules come from (the core)
 
