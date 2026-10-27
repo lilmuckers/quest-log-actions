@@ -1,0 +1,91 @@
+name: Quest Log
+description: Validates a Quest Log data repo on every PR and push, with the rules from the live Quest Log core.
+author: lilmuckers
+branding:
+  icon: flag
+  color: green
+
+inputs:
+  secrets:
+    description: 'Pass `${{ toJSON(secrets) }}`. Only QUEST_* secrets are kept, and each one is masked.'
+    required: false
+    default: '{}'
+  token:
+    description: Token for check runs and PR comments. Needs checks and pull-requests write.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  core-version:
+    description: The Quest Log core version the run used.
+    value: ${{ steps.pointer.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check out the data repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+        fetch-depth: 0
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    # Release commits ship dist/. On @main (the beta channel) it's built here instead.
+    - name: Build the action (beta channel only)
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        if [ ! -f dist/index.mjs ]; then
+          npm ci --no-audit --no-fund
+          npm run build
+        fi
+
+    - name: Resolve the Quest Log core
+      id: pointer
+      shell: bash
+      run: node "${{ github.action_path }}/dist/resolve.mjs" pointer
+
+    - name: Restore the core from cache
+      if: steps.pointer.outputs.local != 'true'
+      id: core-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.pointer.outputs.dir }}
+        key: quest-core-${{ steps.pointer.outputs.version }}
+
+    - name: Download and verify the core
+      shell: bash
+      run: node "${{ github.action_path }}/dist/resolve.mjs" install
+
+    - name: Save the core to cache
+      if: steps.pointer.outputs.local != 'true' && steps.core-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.pointer.outputs.dir }}
+        key: quest-core-${{ steps.pointer.outputs.version }}
+
+    - name: Quest Log
+      shell: bash
+      env:
+        INPUT_SECRETS: ${{ inputs.secrets }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        QUEST_CORE_PATH: ${{ steps.pointer.outputs.dir }}
+        QUEST_CORE_VERSION: ${{ steps.pointer.outputs.version }}
+        QUEST_STATUS_DIR: ${{ runner.temp }}/quest-status
+      run: node "${{ github.action_path }}/dist/index.mjs"
+
+    - name: Upload quest-status
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: quest-status
+        path: ${{ runner.temp }}/quest-status/status.json
+        retention-days: 7
+        if-no-files-found: ignore

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/level.schema.json",
+  "id": "school-bake-sale",
+  "name": "School bake sale",
+  "deliverable": "Six loaves on the table and sold out",
+  "timeboxDays": 7,
+  "startedAt": "2025-10-25T12:36:00Z",
+  "clearedAt": "2025-10-31T07:42:00Z",
+  "successCriteria": [
+    {
+      "id": "six-loaves-baked",
+      "mvp": true,
+      "text": "Six loaves baked",
+      "done": true,
+      "doneAt": "2025-10-30T07:46:00Z"
+    },
+    {
+      "id": "sold-out",
+      "mvp": true,
+      "text": "Sold out",
+      "done": true,
+      "doneAt": "2025-10-31T07:42:00Z"
+    },
+    {
+      "id": "someone-asked-for-the-recipe",
+      "mvp": false,
+      "text": "Someone asked for the recipe",
+      "done": true,
+      "doneAt": "2025-10-30T08:16:00Z"
+    }
+  ],
+  "items": [
+    {
+      "id": "feed-the-starter-up",
+      "title": "Feed the starter up",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-10-26T12:25:00Z"
+    },
+    {
+      "id": "bake-three-on-friday",
+      "title": "Bake three on Friday",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-10-27T18:51:00Z",
+      "budget": 12,
+      "spent": 11
+    },
+    {
+      "id": "bake-three-on-saturday-morning",
+      "title": "Bake three on Saturday morning",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-10-27T21:23:00Z",
+      "budget": 12,
+      "spent": 13
+    },
+    {
+      "id": "labels-with-ingredients",
+      "title": "Labels with ingredients",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-10-28T18:56:00Z",
+      "budget": 6,
+      "spent": 4
+    },
+    {
+      "id": "sale-day",
+      "title": "Sale day",
+      "type": "deliverable",
+      "status": "done",
+      "doneAt": "2025-10-29T07:01:00Z"
+    },
+    {
+      "id": "seeded-loaf",
+      "title": "Seeded loaf",
+      "type": "stretch",
+      "status": "done",
+      "doneAt": "2025-10-30T18:39:00Z",
+      "budget": 8,
+      "spent": 9
+    }
+  ]
+}

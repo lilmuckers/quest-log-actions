@@ -1,0 +1,14 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/world.schema.json",
+  "id": "starter",
+  "name": "Starter",
+  "description": "Flour, water, patience.",
+  "theme": "grass",
+  "goalIds": [
+    "a-loaf-we-would-rather-eat-than-a-shop-one"
+  ],
+  "levelOrder": [
+    "raise-a-starter",
+    "bake-the-first-loaf"
+  ]
+}
