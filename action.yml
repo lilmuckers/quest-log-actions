@@ -7,7 +7,7 @@ branding:
 
 inputs:
   secrets:
-    description: 'Pass `${{ toJSON(secrets) }}`. Only QUEST_* secrets are kept, and each one is masked.'
+    description: 'Pass toJSON(secrets) from the stub. Only QUEST_* secrets are kept, and each one is masked.'
     required: false
     default: '{}'
   token:
