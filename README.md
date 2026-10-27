@@ -29,7 +29,9 @@ on:
   push: { branches: [main], paths: ['data/**'] }
   workflow_dispatch:
 permissions: { contents: write, pull-requests: write, checks: write }
-concurrency: { group: quest-${{ github.ref }}, cancel-in-progress: false }
+concurrency:
+  group: quest-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   quest:
     runs-on: ubuntu-latest
