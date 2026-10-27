@@ -9,7 +9,7 @@ import * as quest from './core.js';
 import { createCheckRun, upsertComment, type Annotation } from './github.js';
 import { CHECK_NAME, COMMENT_MARKER, runValidate, type ValidateOutcome } from './modules/validate.js';
 import { plan as makePlan, type Plan } from './plan.js';
-import { parseSecrets } from './secrets.js';
+import { readSecrets } from './secrets.js';
 import { newStatus, writeStatus, type QuestStatus } from './status.js';
 
 interface Env {
@@ -88,8 +88,8 @@ export async function run(): Promise<void> {
   let env: Env | null = null;
   try {
     env = readEnv();
-    const secrets = parseSecrets(core.getInput('secrets'), core.setSecret);
-    core.info(`Secrets: ${Object.keys(secrets.values).length ? Object.keys(secrets.values).sort().join(', ') : 'none'} (${secrets.ignored.length} non-QUEST_ ignored)`);
+    const secrets = readSecrets(process.env, core.setSecret);
+    core.info(`Secrets: ${Object.keys(secrets.values).join(', ') || 'none'}${secrets.missing.length ? ` (not passed: ${secrets.missing.join(', ')})` : ''}`);
 
     const loaded = loadConfig(env.workspace);
     if (loaded.error) core.warning(loaded.error);

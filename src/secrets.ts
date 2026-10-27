@@ -1,37 +1,30 @@
-/** Secrets arrive as `with: secrets: ${{ toJSON(secrets) }}` (D12). Only `QUEST_*` names are kept. */
-export const SECRET_PREFIX = 'QUEST_';
+/**
+ * Secrets the stub passes by name as step `env:` (D12): `QUEST_X: ${{ secrets.QUEST_X }}`.
+ * Keep in step with `SECRET_NAMES` in gamify-todo's `shared/src/stub.ts`. A named list, not every
+ * `QUEST_*` variable, because the action's own settings (`QUEST_CORE_PATH`, …) share the prefix.
+ */
+export const SECRET_NAMES = ['QUEST_VAPID_PRIVATE_KEY'] as const;
+export type SecretName = (typeof SECRET_NAMES)[number];
 
 export interface Secrets {
-  /** Kept secrets, by name. */
-  values: Record<string, string>;
-  /** Names that were passed in but ignored (never their values). */
-  ignored: string[];
+  /** Secrets that arrived with a value, by name. */
+  values: Partial<Record<SecretName, string>>;
+  /** Names that arrived empty: not set in the repo, an older stub, or a fork PR. */
+  missing: SecretName[];
 }
 
-/**
- * Parses the `secrets` input and masks every kept value with `mask` before returning it.
- * An empty or missing input (fork PRs get no secrets) is not an error.
- */
-export function parseSecrets(input: string | undefined, mask: (value: string) => void): Secrets {
-  const text = (input ?? '').trim();
-  if (!text) return { values: {}, ignored: [] };
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    // Never echo the input: it may hold secret values.
-    throw new Error('The secrets input is not JSON. Pass `secrets: ${{ toJSON(secrets) }}`.');
-  }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('The secrets input must be a JSON object.');
-  const values: Record<string, string> = {};
-  const ignored: string[] = [];
-  for (const [name, value] of Object.entries(raw)) {
-    if (name.startsWith(SECRET_PREFIX) && typeof value === 'string' && value !== '') {
+/** Reads the known secrets from `env` and masks every value with `mask` before returning it. */
+export function readSecrets(env: Record<string, string | undefined>, mask: (value: string) => void): Secrets {
+  const values: Secrets['values'] = {};
+  const missing: SecretName[] = [];
+  for (const name of SECRET_NAMES) {
+    const value = env[name];
+    if (value) {
       mask(value);
       values[name] = value;
     } else {
-      ignored.push(name);
+      missing.push(name);
     }
   }
-  return { values, ignored: ignored.sort() };
+  return { values, missing };
 }

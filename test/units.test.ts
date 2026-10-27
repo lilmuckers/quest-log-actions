@@ -6,28 +6,20 @@ import { DEFAULTS, loadConfig, mergeConfig } from '../src/config.js';
 import { changes, CoreFailed, validate } from '../src/core.js';
 import { pointerLine } from '../src/json-line.js';
 import { plan } from '../src/plan.js';
-import { parseSecrets } from '../src/secrets.js';
+import { readSecrets } from '../src/secrets.js';
 import { newStatus } from '../src/status.js';
 
 describe('secrets', () => {
-  it('keeps and masks QUEST_* only, listing the rest by name', () => {
+  it('reads the named secrets from the environment and masks them', () => {
     const masked: string[] = [];
-    const s = parseSecrets(JSON.stringify({ QUEST_VAPID_PRIVATE_KEY: 'k1', OTHER: 'no', github_token: 't', QUEST_EMPTY: '' }), (v) => masked.push(v));
+    const s = readSecrets({ QUEST_VAPID_PRIVATE_KEY: 'k1', QUEST_CORE_PATH: '/tmp/core', OTHER: 'no' }, (v) => masked.push(v));
     expect(s.values).toEqual({ QUEST_VAPID_PRIVATE_KEY: 'k1' });
     expect(masked).toEqual(['k1']);
-    expect(s.ignored).toEqual(['OTHER', 'QUEST_EMPTY', 'github_token']);
+    expect(s.missing).toEqual([]);
   });
-  it('treats a missing input (fork PRs) as no secrets', () => {
-    expect(parseSecrets('', () => {})).toEqual({ values: {}, ignored: [] });
-    expect(parseSecrets(undefined, () => {})).toEqual({ values: {}, ignored: [] });
-  });
-  it('rejects non-JSON without echoing it', () => {
-    expect(() => parseSecrets('QUEST_X=hunter2', () => {})).toThrow(/not JSON/);
-    try {
-      parseSecrets('QUEST_X=hunter2', () => {});
-    } catch (e) {
-      expect((e as Error).message).not.toContain('hunter2');
-    }
+  it('lists names that arrived empty (unset, older stub or fork PR)', () => {
+    expect(readSecrets({ QUEST_VAPID_PRIVATE_KEY: '' }, () => {})).toEqual({ values: {}, missing: ['QUEST_VAPID_PRIVATE_KEY'] });
+    expect(readSecrets({}, () => {})).toEqual({ values: {}, missing: ['QUEST_VAPID_PRIVATE_KEY'] });
   });
 });
 
