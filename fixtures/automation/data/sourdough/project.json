@@ -1,0 +1,24 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/project.schema.json",
+  "id": "sourdough",
+  "title": "Bread From Scratch",
+  "description": "Learn sourdough without turning it into a personality. Done when a weekly loaf is just a habit and the bake sale table cleared by noon.",
+  "goals": [
+    {
+      "id": "a-loaf-we-would-rather-eat-than-a-shop-one",
+      "title": "A loaf we would rather eat than a shop one"
+    },
+    {
+      "id": "bake-every-week-without-thinking-about-it",
+      "title": "Bake every week without thinking about it"
+    }
+  ],
+  "worldOrder": [
+    "starter",
+    "basics",
+    "bake-sale"
+  ],
+  "budgets": {
+    "currency": "GBP"
+  }
+}

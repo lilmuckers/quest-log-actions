@@ -1,0 +1,7 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/automation.schema.json",
+  "channel": "stable",
+  "schedule": { "every": "3h" },
+  "validate": { "enabled": true, "comment": false },
+  "notify": { "enabled": false, "devices": [] }
+}

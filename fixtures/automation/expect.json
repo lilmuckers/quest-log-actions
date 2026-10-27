@@ -1,0 +1,2 @@
+{ "event": "pull_request", "base": "valid", "ok": true, "check": "success", "comment": false,
+  "expectedFail": "needs a core with automation.json in the schema (gamify-todo G1, #125)" }
