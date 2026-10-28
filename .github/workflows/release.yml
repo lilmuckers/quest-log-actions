@@ -35,7 +35,7 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v${{ inputs.version }}" >/dev/null; then
             echo "::error::v${{ inputs.version }} already exists"; exit 1
           fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
