@@ -1,0 +1,62 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/level.schema.json",
+  "id": "make-it-a-habit",
+  "name": "Make it a habit",
+  "deliverable": "A bake every week for a month with no planning",
+  "timeboxDays": 28,
+  "startedAt": "2025-09-15T20:15:00Z",
+  "clearedAt": "2025-10-12T11:35:00Z",
+  "successCriteria": [
+    {
+      "id": "four-weeks-running",
+      "mvp": true,
+      "text": "Four weeks running",
+      "done": true,
+      "doneAt": "2025-10-09T21:56:00Z"
+    },
+    {
+      "id": "starter-lives-in-the-fridge",
+      "mvp": true,
+      "text": "Starter lives in the fridge",
+      "done": true,
+      "doneAt": "2025-10-12T11:35:00Z"
+    }
+  ],
+  "items": [
+    {
+      "id": "friday-feed-saturday-bake",
+      "title": "Friday feed, Saturday bake",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-09-19T08:22:00Z"
+    },
+    {
+      "id": "week-1",
+      "title": "Week 1",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-09-24T20:00:00Z"
+    },
+    {
+      "id": "week-2",
+      "title": "Week 2",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-09-28T13:30:00Z"
+    },
+    {
+      "id": "week-3",
+      "title": "Week 3",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-10-03T20:25:00Z"
+    },
+    {
+      "id": "week-4",
+      "title": "Week 4",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-10-07T18:07:00Z"
+    }
+  ]
+}

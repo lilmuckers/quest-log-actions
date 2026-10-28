@@ -61,3 +61,9 @@ export async function upsertComment(octokit: Octokit, repo: Repo, issueNumber: n
   const { data } = await octokit.rest.issues.createComment({ ...repo, issue_number: issueNumber, body: text });
   return data.html_url;
 }
+
+/** The conclusion of the newest check run named `name` on `sha`, if there is one. */
+export async function checkConclusion(octokit: Octokit, repo: Repo, sha: string, name: string): Promise<string | undefined> {
+  const { data } = await octokit.rest.checks.listForRef({ ...repo, ref: sha, check_name: name, filter: 'latest', per_page: 1 });
+  return data.check_runs[0]?.conclusion ?? undefined;
+}

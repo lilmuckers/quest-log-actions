@@ -4,7 +4,7 @@ The GitHub Action behind [Quest Log](https://tasks.patrick-mckinley.com) data re
 repo holds a thin workflow (the *stub*) that the Quest Log app writes for you; all the pipeline
 code lives here, so fixes reach every repo without anyone editing their workflow.
 
-What it does today (`v1.0`):
+What it does (`v1.1`):
 
 - **validate**: on every pull request and push, checks `data/` with the live Quest Log rules.
   The result is a `Quest validate` check run with an annotation on each problem line. On pull
@@ -13,7 +13,13 @@ What it does today (`v1.0`):
 - **quest-status**: every run uploads a small `quest-status` artifact
   (`{ ranAt, event, core, modules, sent, expiredDevices }`) that the app reads to show run status.
 
-Coming in `v1.1`: **notify**, Web Push for time-boxes, the weekly review and Warp Zone PRs.
+- **notify**: Web Push to the devices in `data/automation.json`. On scheduled and manual runs:
+  a level's time-box nearly up (under 25% left) or blown, and the weekly review at each
+  device's chosen slot in its own timezone. On pull requests: a new PR in the Warp Zone (an
+  attachment PR reads "📷 New photo waiting"), a failing check, and a fixed one. The rules
+  (phases, review slots) come from the core's `quest.py timers`. Each scheduled push is sent
+  once: what went out is kept in the repo's Actions cache. Devices whose subscription has
+  expired (404/410) are listed in `quest-status` for the app to offer removing.
 
 ## The stub
 
@@ -68,19 +74,32 @@ Optional. With no file, validate is on and everything else is off.
   "channel": "stable",
   "schedule": { "every": "3h" },
   "validate": { "enabled": true, "comment": true },
-  "notify": { "enabled": false, "devices": [] }
+  "notify": {
+    "enabled": true,
+    "vapidPublicKey": "B…",
+    "devices": [{
+      "id": "pixel-7", "label": "Pixel", "addedAt": "2026-10-08T09:00:00Z",
+      "timezone": "Europe/London",
+      "events": { "timebox": true, "review": "fri", "warpZone": true },
+      "subscription": { "endpoint": "https://…", "keys": { "p256dh": "…", "auth": "…" } }
+    }]
+  }
 }
 ```
 
 - `channel`: `stable` uses `@v1`, `beta` uses `@main`. The app writes the matching stub.
 - `validate.comment`: turn off the PR comment and keep just the check run.
-- `schedule` and `notify` are for the notify module (`v1.1`).
+- `schedule.every`: how often scheduled runs happen (`6h`, `3h`, `1h` or `off`). Pushes land at
+  the first run after their moment, so a coarse schedule delivers late but still once.
+- `notify.devices`: written by the app when a device turns push on. Each has its own `timezone`
+  and `events` (`timebox` and `warpZone` default on; `review` is `fri`, `mon`, `sun` or `off`,
+  default `fri`).
 
 ## Secrets
 
 | Name | Used by |
 |---|---|
-| `QUEST_VAPID_PRIVATE_KEY` | notify (`v1.1`); the app sets it the first time a device turns on push |
+| `QUEST_VAPID_PRIVATE_KEY` | notify; the app sets it the first time a device turns on push. Without it nothing is sent, and the job summary says why |
 
 The stub passes each one as step `env:`, and the action reads only these names (`SECRET_NAMES`
 in `src/secrets.ts`) and masks each value. Other secrets in the repo never reach it.

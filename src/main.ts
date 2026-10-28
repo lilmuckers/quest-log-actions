@@ -2,11 +2,14 @@
 // action.yml has already checked out the data repo and resolved the core.
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import webpush from 'web-push';
+import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from './config.js';
 import * as quest from './core.js';
-import { createCheckRun, upsertComment, type Annotation } from './github.js';
+import { checkConclusion, createCheckRun, upsertComment, type Annotation } from './github.js';
+import { loadState, pruneState, runNotify, saveState, type NotifyOutcome, type PrContext, type Sender } from './modules/notify.js';
 import { CHECK_NAME, COMMENT_MARKER, runValidate, type ValidateOutcome } from './modules/validate.js';
 import { plan as makePlan, type Plan } from './plan.js';
 import { readSecrets } from './secrets.js';
@@ -23,6 +26,10 @@ interface Env {
   /** Record API writes to this file instead of calling GitHub (CI fixtures). */
   dryRunOut?: string;
   baseRefOverride?: string;
+  /** Dedup state file, restored from and saved to the Actions cache on scheduled and dispatch runs. */
+  notifyState: string;
+  /** The run time `quest.py timers` works at (QUEST_NOW overrides it for fixtures). */
+  now: Date;
 }
 
 function readEnv(): Env {
@@ -42,6 +49,8 @@ function readEnv(): Env {
     token: core.getInput('token'),
     dryRunOut: process.env.QUEST_DRY_RUN_OUT || undefined,
     baseRefOverride: process.env.QUEST_BASE_REF || undefined,
+    notifyState: process.env.QUEST_NOTIFY_STATE || join(process.env.RUNNER_TEMP ?? '/tmp', 'quest-notify', 'state.json'),
+    now: process.env.QUEST_NOW ? new Date(process.env.QUEST_NOW) : new Date(),
   };
 }
 
@@ -53,6 +62,13 @@ function writer(env: Env) {
     return {
       checkRun: async (run: object) => record('checkRun', run),
       comment: async (body: string) => (record('comment', body), 'dry-run'),
+      previousConclusion: async (): Promise<string | undefined> => undefined,
+      // Endpoints ending in /gone answer 410, so fixtures can check expiredDevices.
+      send: (async (subscription, payload, options) => {
+        if (subscription.endpoint.endsWith('/gone')) throw Object.assign(new Error('Gone'), { statusCode: 410 });
+        record('push', { endpoint: subscription.endpoint, payload: JSON.parse(payload), urgency: options.urgency, TTL: options.TTL });
+        return { statusCode: 201 };
+      }) as Sender,
     };
   }
   const octokit = github.getOctokit(env.token);
@@ -63,10 +79,42 @@ function writer(env: Env) {
       await createCheckRun(octokit, repo, { name: CHECK_NAME, headSha, ...run });
     },
     comment: (body: string) => upsertComment(octokit, repo, env.payload.pull_request.number, COMMENT_MARKER, body),
+    previousConclusion: () => checkConclusion(octokit, repo, env.payload.before, CHECK_NAME),
+    send: webpush.sendNotification as unknown as Sender,
   };
 }
 
-async function jobSummary(p: Plan, status: QuestStatus, validate?: ValidateOutcome) {
+/** Whether a PR changes anything under data/ against its base (true when git can't say). */
+function prTouchesData(env: Env): boolean {
+  const base = env.baseRefOverride ?? `origin/${env.payload.pull_request.base.ref}`;
+  const r = spawnSync('git', ['-C', env.workspace, 'diff', '--name-only', `${base}...HEAD`, '--', 'data/'], { encoding: 'utf8' });
+  return r.status !== 0 || r.stdout.trim() !== '';
+}
+
+async function prContext(env: Env, validate: ValidateOutcome | undefined, previousConclusion: () => Promise<string | undefined>): Promise<PrContext> {
+  const pr = env.payload.pull_request;
+  const action: string = env.payload.action ?? 'opened';
+  let previous: PrContext['previous'];
+  if (action === 'synchronize' && validate?.ok && env.payload.before) {
+    try {
+      const c = await previousConclusion();
+      if (c === 'success' || c === 'failure') previous = c;
+    } catch (e) {
+      core.warning(`Couldn't read the previous ${CHECK_NAME} result (${(e as Error).message}).`);
+    }
+  }
+  return {
+    number: pr.number,
+    action,
+    title: pr.title ?? `PR #${pr.number}`,
+    attachment: String(pr.head?.ref ?? '').startsWith('quest/attach/') || (pr.labels ?? []).some((l: { name?: string }) => l.name === 'quest:attachment'),
+    ok: validate?.ok,
+    previous,
+    touchesData: prTouchesData(env),
+  };
+}
+
+async function jobSummary(p: Plan, status: QuestStatus, validate?: ValidateOutcome, notify?: NotifyOutcome) {
   const rows = p.modules.map((m) => [m.name, status.modules[m.name]?.ran ? 'ran' : 'skipped', status.modules[m.name]?.reason ?? m.reason]);
   core.summary
     .addHeading('Quest Log', 2)
@@ -79,6 +127,11 @@ async function jobSummary(p: Plan, status: QuestStatus, validate?: ValidateOutco
       core.summary.addRaw(`Changes: ${c.added.length} added, ${c.changed.length} changed, ${c.removed.length} removed`, true);
     }
     for (const d of validate.degraded) core.summary.addRaw(`⚠ ${d}`, true);
+  }
+  if (notify?.ran) {
+    const sent = Object.values(notify.sent).reduce((a, b) => a + b, 0);
+    core.summary.addRaw(`Push: ${sent} sent, ${notify.deduped} already sent before, ${notify.failed} failed`, true);
+    if (notify.expiredDevices.length) core.summary.addRaw(`⚠ Stopped receiving pushes: ${notify.expiredDevices.join(', ')}`, true);
   }
   await core.summary.write();
 }
@@ -98,9 +151,9 @@ export async function run(): Promise<void> {
     for (const m of p.modules) core.info(`${m.name}: ${m.run ? 'runs' : 'skipped'} (${m.reason})`);
 
     const coreRef: quest.Core = { dir: env.coreDir, version: env.coreVersion };
+    const w = writer(env);
     let validate: ValidateOutcome | undefined;
     if (p.modules.find((m) => m.name === 'validate')?.run) {
-      const w = writer(env);
       const base = env.baseRefOverride ?? (env.payload.pull_request ? `origin/${env.payload.pull_request.base.ref}` : undefined);
       validate = await runValidate({
         dir: env.workspace,
@@ -121,7 +174,40 @@ export async function run(): Promise<void> {
       };
     }
 
-    await jobSummary(p, status, validate);
+    let notify: NotifyOutcome | undefined;
+    if (p.modules.find((m) => m.name === 'notify')?.run) {
+      const e = env;
+      const scheduled = e.event !== 'pull_request';
+      const state = scheduled ? pruneState(loadState(e.notifyState), e.now) : undefined;
+      notify = await runNotify({
+        config: loaded.config.notify,
+        privateKey: secrets.values.QUEST_VAPID_PRIVATE_KEY,
+        ctx: {
+          now: e.now,
+          timers: scheduled ? quest.timers(coreRef, e.workspace, e.now) : undefined,
+          pr: scheduled ? undefined : await prContext(e, validate, w.previousConclusion),
+        },
+        state,
+        send: w.send,
+        warn: (m) => core.warning(m),
+      });
+      if (state) {
+        saveState(e.notifyState, state);
+        core.setOutput('notify-state', 'saved');
+      }
+      status.sent = notify.sent;
+      status.expiredDevices = notify.expiredDevices;
+      status.modules.notify = {
+        ran: notify.ran,
+        reason: notify.reason ?? status.modules.notify!.reason,
+        ok: notify.failed === 0,
+        detail: { sent: Object.values(notify.sent).reduce((a, b) => a + b, 0), deduped: notify.deduped, failed: notify.failed, expired: notify.expiredDevices.length },
+      };
+      if (notify.reason) core.info(`notify: nothing sent (${notify.reason})`);
+      for (const id of notify.expiredDevices) core.warning(`Device ${id} stopped receiving pushes (404/410). Remove it in Settings → Automation.`);
+    }
+
+    await jobSummary(p, status, validate, notify);
     if (validate && !validate.ok) core.setFailed(`${validate.issues} issue(s) in the quest data. See the ${CHECK_NAME} check.`);
   } catch (e) {
     const message = (e as Error).message;
