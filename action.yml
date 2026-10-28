@@ -1,5 +1,5 @@
 name: Quest Log
-description: Validates a Quest Log data repo on every PR and push, with the rules from the live Quest Log core.
+description: Validates a Quest Log data repo on every PR and push, and sends its push notifications, with the rules from the live Quest Log core.
 author: lilmuckers
 branding:
   icon: flag
@@ -69,14 +69,34 @@ runs:
         path: ${{ steps.pointer.outputs.dir }}
         key: quest-core-${{ steps.pointer.outputs.version }}
 
+    # Notify dedup state (which pushes went out), on scheduled and dispatch runs only. PR runs
+    # need none, and caches they save aren't visible on the default branch anyway.
+    - name: Restore the notify state
+      if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/quest-notify
+        key: quest-notify-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: quest-notify-
+
     - name: Quest Log
+      id: quest
       shell: bash
       env:
         INPUT_TOKEN: ${{ inputs.token }}
         QUEST_CORE_PATH: ${{ steps.pointer.outputs.dir }}
         QUEST_CORE_VERSION: ${{ steps.pointer.outputs.version }}
         QUEST_STATUS_DIR: ${{ runner.temp }}/quest-status
+        QUEST_NOTIFY_STATE: ${{ runner.temp }}/quest-notify/state.json
       run: node "${{ github.action_path }}/dist/index.mjs"
+
+    # always(): pushes already sent must stay recorded even when validate fails the job.
+    - name: Save the notify state
+      if: always() && steps.quest.outputs.notify-state == 'saved'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ runner.temp }}/quest-notify
+        key: quest-notify-${{ github.run_id }}-${{ github.run_attempt }}
 
     - name: Upload quest-status
       if: always()

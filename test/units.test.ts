@@ -60,9 +60,9 @@ describe('plan', () => {
     expect(plan('push', DEFAULTS).comment).toBe(false);
     expect(plan('pull_request', mergeConfig({ validate: { comment: false } } as never)).comment).toBe(false);
   });
-  it('never runs notify yet, and says why', () => {
-    const p = plan('schedule', mergeConfig({ notify: { enabled: true } } as never));
-    expect(p.modules.find((m) => m.name === 'notify')).toEqual({ name: 'notify', run: false, reason: 'notify arrives in v1.1' });
+  it('skips notify without a public key or devices, and says why', () => {
+    const p = plan('schedule', mergeConfig({ notify: { enabled: true, vapidPublicKey: 'B' } } as never));
+    expect(p.modules.find((m) => m.name === 'notify')).toEqual({ name: 'notify', run: false, reason: 'no devices in notify.devices' });
   });
   it('seeds quest-status from the plan', () => {
     const s = newStatus('push', '1.0.0', plan('push', DEFAULTS), new Date('2026-10-27T10:00:00Z'));

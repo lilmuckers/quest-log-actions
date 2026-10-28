@@ -59,3 +59,36 @@ export function validate(core: Core, dir: string, run: Run = defaultRun(core)): 
 export function changes(core: Core, dir: string, ref: string, run: Run = defaultRun(core)): ChangesResult {
   return parse('changes', run(['changes', '--git', ref, dir, '--json', '--warn']), [0]);
 }
+
+/** One running clock from `quest.py timers`. Levels are the only scope today; skip unknown ones. */
+export interface Timer {
+  key: string;
+  scope: string;
+  project: string;
+  world: string;
+  level: string;
+  title?: string;
+  phase: 'ok' | 'hurry' | 'overdue';
+  phaseSince: string;
+  endsAt: string;
+  nudge: { tone: string; text: string } | null;
+}
+
+export interface ReviewSlot {
+  /** 0 = Sunday, as in JS `getDay()`. */
+  weekday: number;
+  hour: number;
+  label: string;
+}
+
+export interface TimersResult {
+  schemaVersion: number;
+  now: string;
+  timers: Timer[];
+  reviewSlots: Record<string, ReviewSlot>;
+}
+
+/** `quest.py timers DIR --json --now ISO`: time-box phases and review slots (G3). */
+export function timers(core: Core, dir: string, now: Date, run: Run = defaultRun(core)): TimersResult {
+  return parse('timers', run(['timers', dir, '--json', '--now', now.toISOString()]), [0]);
+}

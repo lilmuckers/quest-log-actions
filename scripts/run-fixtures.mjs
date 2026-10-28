@@ -71,11 +71,11 @@ function runFixture(name, core) {
   const out = join(work, `${name}.calls.jsonl`);
   const statusDir = join(work, `${name}-status`);
   const eventPath = join(work, `${name}.event.json`);
-  const payload = expect.event === 'pull_request' ? { pull_request: { number: 1, head: { sha: repo.sha }, base: { ref: 'main' } } } : { after: repo.sha };
+  const payload = expect.event === 'pull_request' ? { action: expect.action ?? 'opened', pull_request: { number: 1, title: `Fixture ${name}`, head: { sha: repo.sha, ref: 'pr' }, base: { ref: 'main' } } } : { after: repo.sha };
   writeFileSync(eventPath, JSON.stringify(payload));
   const summary = join(work, `${name}.summary.md`);
   writeFileSync(summary, '');
-  const r = spawnSync('node', [join(root, 'dist/index.mjs')], {
+  const exec = () => spawnSync('node', [join(root, 'dist/index.mjs')], {
     encoding: 'utf8',
     env: {
       PATH: process.env.PATH,
@@ -86,21 +86,27 @@ function runFixture(name, core) {
       GITHUB_REPOSITORY: 'owner/data',
       GITHUB_SHA: repo.sha,
       GITHUB_STEP_SUMMARY: summary,
+      GITHUB_OUTPUT: join(work, `${name}.output`),
       RUNNER_TEMP: work,
       QUEST_CORE_PATH: core.dir,
       QUEST_CORE_VERSION: core.version,
       QUEST_STATUS_DIR: statusDir,
       QUEST_DRY_RUN_OUT: out,
       QUEST_BASE_REF: 'main',
+      QUEST_NOTIFY_STATE: join(work, `${name}-notify`, 'state.json'),
+      ...(expect.now ? { QUEST_NOW: expect.now } : {}),
       INPUT_TOKEN: 'unused-in-dry-run',
       QUEST_VAPID_PRIVATE_KEY: SECRET,
       OTHER_BAR: 'not-kept',
     },
   });
+  writeFileSync(join(work, `${name}.output`), '');
+  const r = exec();
   const log = r.stdout + r.stderr;
   const calls = existsSync(out) ? readFileSync(out, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
   const check = calls.find((c) => c.kind === 'checkRun')?.data;
   const comment = calls.find((c) => c.kind === 'comment')?.data;
+  const pushes = calls.filter((c) => c.kind === 'push');
   const status = existsSync(join(statusDir, 'status.json')) ? JSON.parse(readFileSync(join(statusDir, 'status.json'), 'utf8')) : null;
 
   const problems = [];
@@ -115,12 +121,28 @@ function runFixture(name, core) {
     want(status?.error?.includes(expect.error), 'quest-status has no error');
   } else {
     want((r.status === 0) === expect.ok, `exit ${r.status}, expected ${expect.ok ? 0 : 'failure'}`);
-    want(check?.conclusion === expect.check, `check run ${check?.conclusion}, expected ${expect.check}`);
-    want(status?.modules?.validate?.ok === expect.ok, 'quest-status validate.ok wrong');
+    if ('check' in expect) {
+      want(check?.conclusion === expect.check, `check run ${check?.conclusion}, expected ${expect.check}`);
+      want(status?.modules?.validate?.ok === expect.ok, 'quest-status validate.ok wrong');
+    }
     if (expect.issueFile) want(check?.annotations?.some((a) => a.path === expect.issueFile && a.start_line > 1), `no annotation on ${expect.issueFile} with a line`);
     if ('comment' in expect) want(!!comment === expect.comment, `comment ${comment ? 'written' : 'missing'}`);
     for (const k of expect.added ?? []) want(comment?.includes(k), `comment lacks added ${k}`);
     for (const k of expect.removed ?? []) want(comment?.includes(k), `comment lacks removed ${k}`);
+    if ('pushes' in expect) {
+      want(pushes.length === expect.pushes, `${pushes.length} push(es) sent, expected ${expect.pushes}: ${pushes.map((c) => c.data.payload.title).join(' | ')}`);
+      want(status?.modules?.notify?.ran === true, `quest-status notify didn't run (${status?.modules?.notify?.reason})`);
+      want(Object.values(status?.sent ?? {}).reduce((a, b) => a + b, 0) === expect.pushes, 'quest-status sent counts wrong');
+    }
+    if ('expiredDevices' in expect) want(JSON.stringify(status?.expiredDevices) === JSON.stringify(expect.expiredDevices), `quest-status expiredDevices ${JSON.stringify(status?.expiredDevices)}`);
+    if ('rerunPushes' in expect) {
+      // A second scheduled run with the saved dedup state.
+      want(readFileSync(join(work, `${name}.output`), 'utf8').includes('notify-state'), 'notify-state output not set');
+      const before = readFileSync(out, 'utf8').trim().split('\n').length;
+      exec();
+      const again = readFileSync(out, 'utf8').trim().split('\n').slice(before).map((l) => JSON.parse(l)).filter((c) => c.kind === 'push');
+      want(again.length === expect.rerunPushes, `rerun sent ${again.length} push(es), expected ${expect.rerunPushes}`);
+    }
   }
   return { name, problems, expectedFail: expect.expectedFail, log };
 }

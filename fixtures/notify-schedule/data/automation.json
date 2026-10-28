@@ -1,0 +1,53 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/automation.schema.json",
+  "channel": "beta",
+  "schedule": {
+    "every": "3h"
+  },
+  "validate": {
+    "enabled": true,
+    "comment": false
+  },
+  "notify": {
+    "enabled": true,
+    "vapidPublicKey": "BFixturePublicKeyFixturePublicKeyFixturePublicKeyFixturePublicKeyFixturePublicKey0",
+    "devices": [
+      {
+        "id": "phone",
+        "label": "Phone",
+        "addedAt": "2026-10-20T09:00:00Z",
+        "timezone": "Europe/London",
+        "events": {
+          "timebox": true,
+          "review": "fri",
+          "warpZone": true
+        },
+        "subscription": {
+          "endpoint": "https://push.example/phone",
+          "keys": {
+            "p256dh": "BFixtureP256dh",
+            "auth": "fixtureAuth"
+          }
+        }
+      },
+      {
+        "id": "laptop",
+        "label": "Laptop",
+        "addedAt": "2026-10-20T09:00:00Z",
+        "timezone": "America/New_York",
+        "events": {
+          "timebox": true,
+          "review": "fri",
+          "warpZone": true
+        },
+        "subscription": {
+          "endpoint": "https://push.example/laptop",
+          "keys": {
+            "p256dh": "BFixtureP256dh",
+            "auth": "fixtureAuth"
+          }
+        }
+      }
+    ]
+  }
+}
