@@ -51,7 +51,7 @@ runs:
     - name: Restore the core from cache
       if: steps.pointer.outputs.local != 'true'
       id: core-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: ${{ steps.pointer.outputs.dir }}
         key: quest-core-${{ steps.pointer.outputs.version }}
@@ -62,7 +62,7 @@ runs:
 
     - name: Save the core to cache
       if: steps.pointer.outputs.local != 'true' && steps.core-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: ${{ steps.pointer.outputs.dir }}
         key: quest-core-${{ steps.pointer.outputs.version }}
