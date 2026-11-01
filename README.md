@@ -21,6 +21,12 @@ What it does (`v1.1`):
   once: what went out is kept in the repo's Actions cache. Devices whose subscription has
   expired (404/410) are listed in `quest-status` for the app to offer removing.
 
+- **read**: on a pull request labelled `quest:read-auto` (the app adds it when the repo's
+  `photos.reader` is `open-weight`), reads the photo with open-weight models on the runner: OCR
+  and per-kind rules, or a caption for a photo with no words. It saves the result to the photo's
+  sidecar with the core's `quest.py photo-save`, and flags what it can't read well for an agent.
+  The models run in a step with no token. See [`reader/`](reader).
+
 ## The stub
 
 You don't write this by hand: turn automation on in **Settings → Automation** in the app, and it
