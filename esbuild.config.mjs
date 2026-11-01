@@ -12,4 +12,4 @@ const shared = {
   logLevel: 'info',
 };
 
-await build({ ...shared, entryPoints: { index: 'src/main.ts', resolve: 'src/resolve-cli.ts' }, outdir: 'dist', outExtension: { '.js': '.mjs' } });
+await build({ ...shared, entryPoints: { index: 'src/main.ts', resolve: 'src/resolve-cli.ts', claude: 'src/claude-cli.ts' }, outdir: 'dist', outExtension: { '.js': '.mjs' } });

@@ -25,7 +25,10 @@ What it does (`v1.1`):
   `photos.reader` is `open-weight`), reads the photo with open-weight models on the runner: OCR
   and per-kind rules, or a caption for a photo with no words. It saves the result to the photo's
   sidecar with the core's `quest.py photo-save`, and flags what it can't read well for an agent.
-  The models run in a step with no token. See [`reader/`](reader).
+  The models run in a step with no token. See [`reader/`](reader). On a pull request labelled
+  `quest:read-claude` (`photos.reader` is `claude`) it makes one Claude API call instead, with the
+  model in `photos.model`, and saves the answer the same way. A photo Claude can't read is marked
+  `quest:read-failed` for the person to describe.
 
 ## The stub
 
@@ -65,8 +68,9 @@ the app offers to write.
 | Input | Default | What it's for |
 |---|---|---|
 | `token` | `${{ github.token }}` | Writes the check run and the PR comment. |
+| `anthropic-api-key` | none | Reads photos with Claude. Step `env:` would reach every step in the action, third-party ones included, so this one comes in as an input. |
 
-Secrets come in as step `env:` (see the stub), not as an input.
+Other secrets come in as step `env:` (see the stub).
 
 On pull requests from forks GitHub passes no secrets and a read-only token. The action still
 validates, and reports problems as workflow annotations instead of a check run.
@@ -106,8 +110,9 @@ Optional. With no file, validate is on and everything else is off.
 | Name | Used by |
 |---|---|
 | `QUEST_VAPID_PRIVATE_KEY` | notify; the app sets it the first time a device turns on push. Without it nothing is sent, and the job summary says why |
+| `ANTHROPIC_API_KEY` | read, when `photos.reader` is `claude`; you add it in Settings → Automation. Only the step that calls Claude sees it, and that step has no GitHub token. |
 
-The stub passes each one as step `env:`, and the action reads only these names (`SECRET_NAMES`
+The stub passes the VAPID key as step `env:`, and the action reads only these names (`SECRET_NAMES`
 in `src/secrets.ts`) and masks each value. Other secrets in the repo never reach it.
 
 ## Where the rules come from (the core)

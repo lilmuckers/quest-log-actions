@@ -10,7 +10,7 @@ function setup(result?: string, save = vi.fn(() => ({ sha: 'new' }))) {
   const outDir = mkdtempSync(join(tmpdir(), 'read-'));
   if (result !== undefined) writeFileSync(join(outDir, 'result.json'), result);
   const handOver = vi.fn();
-  return { outDir, save, handOver, warn: vi.fn() };
+  return { outDir, reader: 'the open models', save, handOver, warn: vi.fn() };
 }
 const read = { kind: 'receipt', confidence: 'high' };
 

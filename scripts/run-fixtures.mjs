@@ -138,6 +138,8 @@ function runFixture(name, core) {
       const handed = calls.find((c) => c.kind === 'handOver')?.data;
       want(status?.modules?.read?.detail?.result === expect.read, `quest-status read ${JSON.stringify(status?.modules?.read)}`);
       want(expect.read === 'handed-over' ? !!handed && !saved : !!saved && saved.flag === (expect.read === 'flagged'), `read calls: ${JSON.stringify({ saved, handed })}`);
+      if (expect.readMode) want(saved?.mode === expect.readMode, `read mode ${saved?.mode}`);
+      if ('gaveUp' in expect) want(calls.find((c) => c.kind === 'handOver')?.gaveUp === expect.gaveUp, 'not given up as expected');
       if (expect.read !== 'handed-over') want(calls.some((c) => c.kind === 'checkRun' && c.data.headSha === 'dry-run-sha' && c.data.conclusion === expect.check), 'no check run on the new head');
     }
     if ('pushes' in expect) {

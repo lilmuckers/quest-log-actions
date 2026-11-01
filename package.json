@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "description": "The Quest Log GitHub Action: validates, sends push notifications and reads photos for a Quest Log data repo.",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
@@ -14,6 +16,7 @@
   "dependencies": {
     "@actions/core": "^3.0.1",
     "@actions/github": "^9.1.1",
+    "@anthropic-ai/sdk": "^1.3.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

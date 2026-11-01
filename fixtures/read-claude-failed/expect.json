@@ -1,0 +1,1 @@
+{ "event": "pull_request", "action": "labeled", "base": "valid", "ok": true, "check": "success", "labels": ["quest:attachment", "quest:read-claude"], "read": "handed-over", "gaveUp": true, "readerResult": { "error": "Claude declined to read it." } }

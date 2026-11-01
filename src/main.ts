@@ -11,7 +11,7 @@ import * as quest from './core.js';
 import { checkConclusion, createCheckRun, upsertComment, type Annotation } from './github.js';
 import { loadState, pruneState, runNotify, saveState, type NotifyOutcome, type PrContext, type Sender } from './modules/notify.js';
 import { CHECK_NAME, COMMENT_MARKER, runValidate, type ValidateOutcome } from './modules/validate.js';
-import { runRead, type ReadOutcome } from './modules/read.js';
+import { READ_CLAUDE_LABEL, runRead, type ReadOutcome } from './modules/read.js';
 import { plan as makePlan, type Plan } from './plan.js';
 import { readSecrets } from './secrets.js';
 import { newStatus, writeStatus, type QuestStatus } from './status.js';
@@ -152,7 +152,9 @@ export async function run(): Promise<void> {
     const loaded = loadConfig(env.workspace);
     if (loaded.error) core.warning(loaded.error);
     const labels = (env.payload.pull_request?.labels ?? []).map((l: { name?: string }) => l.name ?? '');
-    const p = makePlan(env.event, loaded.config, labels);
+    // The event's labels can be stale: a second run queued behind the first still lists them. The
+    // step before the reader looks at the live ones, so a photo is never read and charged for twice.
+    const p = makePlan(env.event, loaded.config, process.env.QUEST_READ_WAITING === 'false' ? [] : labels);
     status = newStatus(env.event, env.coreVersion, p);
     for (const m of p.modules) core.info(`${m.name}: ${m.run ? 'runs' : 'skipped'} (${m.reason})`);
 
@@ -217,17 +219,20 @@ export async function run(): Promise<void> {
     if (p.modules.find((m) => m.name === 'read')?.run) {
       const e = env;
       const pull = { repo: process.env.GITHUB_REPOSITORY ?? '', pr: e.payload.pull_request.number as number, token: e.token };
+      const claude = labels.includes(READ_CLAUDE_LABEL);
       read = runRead({
         outDir: e.readOut,
+        reader: claude ? 'Claude' : 'the open models',
         save: (file, model, flag) => {
           if (e.dryRunOut) {
-            appendFileSync(e.dryRunOut, JSON.stringify({ kind: 'read', data: { read: JSON.parse(readFileSync(file, 'utf8')), model, flag } }) + '\n');
+            appendFileSync(e.dryRunOut, JSON.stringify({ kind: 'read', data: { read: JSON.parse(readFileSync(file, 'utf8')), mode: claude ? 'claude' : 'open-weight', model, flag } }) + '\n');
             return { sha: 'dry-run-sha' };
           }
-          return quest.photoSave(coreRef, pull, file, model, flag);
+          return quest.photoSave(coreRef, pull, file, claude ? 'claude' : 'open-weight', model, flag);
         },
         handOver: (note) => {
-          if (e.dryRunOut) appendFileSync(e.dryRunOut, JSON.stringify({ kind: 'handOver', data: note }) + '\n');
+          if (e.dryRunOut) appendFileSync(e.dryRunOut, JSON.stringify({ kind: 'handOver', data: note, ...(claude && { gaveUp: true }) }) + '\n');
+          else if (claude) quest.photoGiveUp(coreRef, pull, note);
           else quest.photoFlag(coreRef, pull, note);
         },
         warn: (m) => core.warning(m),

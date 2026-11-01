@@ -1,5 +1,5 @@
 import type { Automation } from './config.js';
-import { READ_AUTO_LABEL } from './modules/read.js';
+import { READ_AUTO_LABEL, READ_CLAUDE_LABEL } from './modules/read.js';
 
 export type ModuleName = 'validate' | 'notify' | 'read';
 
@@ -39,13 +39,14 @@ export function plan(event: string, config: Automation, labels: string[] = []): 
           ? { name: 'notify', run: false, reason: 'no devices in notify.devices' }
           : { name: 'notify', run: true, reason: event === 'pull_request' ? 'pull_request (warpZone)' : `${event} (timebox, review)` };
 
-  // The app adds the label only when the repo's reader is open-weight, so a photo added then is
+  // The app adds a label only when the repo's reader is one of these, so a photo added then is
   // still read if the setting has since changed.
+  const readLabel = [READ_AUTO_LABEL, READ_CLAUDE_LABEL].find((l) => labels.includes(l));
   const read: ModulePlan = event !== 'pull_request'
     ? { name: 'read', run: false, reason: `not run on ${event}` }
-    : !labels.includes(READ_AUTO_LABEL)
-      ? { name: 'read', run: false, reason: `no ${READ_AUTO_LABEL} label` }
-      : { name: 'read', run: true, reason: READ_AUTO_LABEL };
+    : !readLabel
+      ? { name: 'read', run: false, reason: 'no reader label' }
+      : { name: 'read', run: true, reason: readLabel };
 
   return { event, modules: [validate, notify, read], comment: event === 'pull_request' && validate.run && config.validate.comment };
 }

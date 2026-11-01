@@ -2,6 +2,7 @@
  * Secrets the stub passes by name as step `env:` (D12): `QUEST_X: ${{ secrets.QUEST_X }}`.
  * Keep in step with `SECRET_NAMES` in gamify-todo's `shared/src/stub.ts`. A named list, not every
  * `QUEST_*` variable, because the action's own settings (`QUEST_CORE_PATH`, …) share the prefix.
+ * ANTHROPIC_API_KEY isn't here: it's an action input, used only by the step that calls Claude.
  */
 export const SECRET_NAMES = ['QUEST_VAPID_PRIVATE_KEY'] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];

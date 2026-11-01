@@ -44,14 +44,19 @@ function photoCommand(core: Core, pull: PhotoPull, args: string[]) {
 }
 
 /** Saves a read to the photo's sidecar. Returns the new head commit. */
-export function photoSave(core: Core, pull: PhotoPull, file: string, model: string | undefined, flag: boolean): { sha: string } {
-  const out = photoCommand(core, pull, ['photo-save', '--read', file, '--mode', 'open-weight', '--json', ...(model ? ['--model', model] : []), ...(flag ? ['--flag'] : [])]);
+export function photoSave(core: Core, pull: PhotoPull, file: string, mode: 'open-weight' | 'claude', model: string | undefined, flag: boolean): { sha: string } {
+  const out = photoCommand(core, pull, ['photo-save', '--read', file, '--mode', mode, '--json', ...(model ? ['--model', model] : []), ...(flag ? ['--flag'] : [])]);
   return { sha: JSON.parse(out).sha };
 }
 
 /** Leaves the photo for an agent, with nothing saved. */
 export function photoFlag(core: Core, pull: PhotoPull, note: string): void {
   photoCommand(core, pull, ['photo-flag', '--note', note]);
+}
+
+/** Marks the photo as unreadable, for the person to describe. */
+export function photoGiveUp(core: Core, pull: PhotoPull, note: string): void {
+  photoCommand(core, pull, ['photo-give-up', '--note', note]);
 }
 
 type Run = (args: string[]) => { status: number | null; stdout: string; stderr: string };
