@@ -1,0 +1,17 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/world.schema.json",
+  "id": "basics",
+  "name": "Basics",
+  "description": "Same recipe until it works.",
+  "theme": "desert",
+  "goalIds": [
+    "a-loaf-we-would-rather-eat-than-a-shop-one"
+  ],
+  "unlocksAfter": [
+    "starter"
+  ],
+  "levelOrder": [
+    "nail-one-recipe",
+    "make-it-a-habit"
+  ]
+}

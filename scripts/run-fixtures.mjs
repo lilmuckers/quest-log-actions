@@ -71,10 +71,13 @@ function runFixture(name, core) {
   const out = join(work, `${name}.calls.jsonl`);
   const statusDir = join(work, `${name}-status`);
   const eventPath = join(work, `${name}.event.json`);
-  const payload = expect.event === 'pull_request' ? { action: expect.action ?? 'opened', pull_request: { number: 1, title: `Fixture ${name}`, head: { sha: repo.sha, ref: 'pr' }, base: { ref: 'main' } } } : { after: repo.sha };
+  const payload = expect.event === 'pull_request' ? { action: expect.action ?? 'opened', pull_request: { number: 1, title: `Fixture ${name}`, labels: (expect.labels ?? []).map((l) => ({ name: l })), head: { sha: repo.sha, ref: 'pr' }, base: { ref: 'main' } } } : { after: repo.sha };
   writeFileSync(eventPath, JSON.stringify(payload));
   const summary = join(work, `${name}.summary.md`);
   writeFileSync(summary, '');
+  const readOut = join(work, `${name}-read`);
+  mkdirSync(readOut, { recursive: true });
+  if (expect.readerResult) writeFileSync(join(readOut, 'result.json'), JSON.stringify(expect.readerResult));
   const exec = () => spawnSync('node', [join(root, 'dist/index.mjs')], {
     encoding: 'utf8',
     env: {
@@ -94,6 +97,7 @@ function runFixture(name, core) {
       QUEST_DRY_RUN_OUT: out,
       QUEST_BASE_REF: 'main',
       QUEST_NOTIFY_STATE: join(work, `${name}-notify`, 'state.json'),
+      QUEST_READ_OUT: readOut,
       ...(expect.now ? { QUEST_NOW: expect.now } : {}),
       INPUT_TOKEN: 'unused-in-dry-run',
       QUEST_VAPID_PRIVATE_KEY: SECRET,
@@ -129,6 +133,13 @@ function runFixture(name, core) {
     if ('comment' in expect) want(!!comment === expect.comment, `comment ${comment ? 'written' : 'missing'}`);
     for (const k of expect.added ?? []) want(comment?.includes(k), `comment lacks added ${k}`);
     for (const k of expect.removed ?? []) want(comment?.includes(k), `comment lacks removed ${k}`);
+    if ('read' in expect) {
+      const saved = calls.find((c) => c.kind === 'read')?.data;
+      const handed = calls.find((c) => c.kind === 'handOver')?.data;
+      want(status?.modules?.read?.detail?.result === expect.read, `quest-status read ${JSON.stringify(status?.modules?.read)}`);
+      want(expect.read === 'handed-over' ? !!handed && !saved : !!saved && saved.flag === (expect.read === 'flagged'), `read calls: ${JSON.stringify({ saved, handed })}`);
+      if (expect.read !== 'handed-over') want(calls.some((c) => c.kind === 'checkRun' && c.data.headSha === 'dry-run-sha' && c.data.conclusion === expect.check), 'no check run on the new head');
+    }
     if ('pushes' in expect) {
       want(pushes.length === expect.pushes, `${pushes.length} push(es) sent, expected ${expect.pushes}: ${pushes.map((c) => c.data.payload.title).join(' | ')}`);
       want(status?.modules?.notify?.ran === true, `quest-status notify didn't run (${status?.modules?.notify?.reason})`);

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/level.schema.json",
+  "id": "nail-one-recipe",
+  "name": "Nail one recipe",
+  "deliverable": "Three good loaves in a row from one recipe",
+  "timeboxDays": 21,
+  "startedAt": "2025-08-23T16:36:00Z",
+  "clearedAt": "2025-09-16T08:17:00Z",
+  "successCriteria": [
+    {
+      "id": "three-good-loaves-running",
+      "mvp": true,
+      "text": "Three good loaves running",
+      "done": true,
+      "doneAt": "2025-09-14T13:53:00Z"
+    },
+    {
+      "id": "notes-for-each-bake",
+      "mvp": true,
+      "text": "Notes for each bake",
+      "done": true,
+      "doneAt": "2025-09-16T08:17:00Z"
+    },
+    {
+      "id": "open-crumb",
+      "mvp": false,
+      "text": "Open crumb",
+      "done": false
+    }
+  ],
+  "items": [
+    {
+      "id": "loaf-1",
+      "title": "Loaf 1",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-08-26T21:44:00Z",
+      "budget": 3,
+      "spent": 4
+    },
+    {
+      "id": "loaf-2",
+      "title": "Loaf 2",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-08-30T14:47:00Z",
+      "budget": 3,
+      "spent": 3
+    },
+    {
+      "id": "loaf-3",
+      "title": "Loaf 3",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-09-01T18:44:00Z",
+      "budget": 3,
+      "spent": 4
+    },
+    {
+      "id": "loaf-4",
+      "title": "Loaf 4",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-09-05T07:41:00Z",
+      "budget": 3,
+      "spent": 3
+    },
+    {
+      "id": "loaf-5",
+      "title": "Loaf 5",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-09-10T20:14:00Z",
+      "budget": 3,
+      "spent": 3
+    },
+    {
+      "id": "stop-chasing-the-open-crumb",
+      "title": "Stop chasing the open crumb?",
+      "type": "decision",
+      "status": "done",
+      "doneAt": "2025-09-13T13:16:00Z",
+      "notes": "Yes. It is toast bread."
+    },
+    {
+      "id": "try-rye",
+      "title": "Try rye",
+      "type": "stretch",
+      "status": "dropped",
+      "budget": 8
+    }
+  ],
+  "stats": {
+    "editsAfterClear": 3,
+    "itemEdits": {
+      "loaf-3": 5
+    }
+  },
+  "budget": 30
+}

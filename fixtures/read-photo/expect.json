@@ -1,0 +1,1 @@
+{ "event": "pull_request", "action": "labeled", "base": "valid", "ok": true, "check": "success", "labels": ["quest:attachment", "quest:read-auto"], "read": "read", "readerResult": { "flag": false, "model": "paddleocr-en-v5", "read": {"kind":"receipt","confidence":"high","text":"TOTAL 5.00","fields":{"total":"5.00"}} } }

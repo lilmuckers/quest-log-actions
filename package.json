@@ -2,12 +2,13 @@
   "name": "quest-log-actions",
   "private": true,
   "type": "module",
-  "description": "The Quest Log GitHub Action: validates and sends push notifications for a Quest Log data repo.",
+  "description": "The Quest Log GitHub Action: validates, sends push notifications and reads photos for a Quest Log data repo.",
   "engines": { "node": ">=22" },
   "scripts": {
     "build": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:reader": "cd reader && python3 -m unittest test_rules",
     "fixtures": "node scripts/run-fixtures.mjs"
   },
   "dependencies": {
