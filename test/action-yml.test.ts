@@ -9,4 +9,8 @@ describe('action.yml', () => {
     const bad = text.split('\n').filter((l) => /^\s*description:/.test(l) && l.includes('${{'));
     expect(bad).toEqual([]);
   });
+  // Composite steps don't have it: the runner refuses to load the whole action.
+  it('has no timeout-minutes', () => {
+    expect(readFileSync(join(import.meta.dirname, '../action.yml'), 'utf8')).not.toContain('timeout-minutes');
+  });
 });

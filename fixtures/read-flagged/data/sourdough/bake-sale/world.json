@@ -1,0 +1,17 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/world.schema.json",
+  "id": "bake-sale",
+  "name": "Bake Sale",
+  "description": "Show off, once.",
+  "theme": "castle",
+  "goalIds": [
+    "a-loaf-we-would-rather-eat-than-a-shop-one",
+    "bake-every-week-without-thinking-about-it"
+  ],
+  "unlocksAfter": [
+    "basics"
+  ],
+  "levelOrder": [
+    "school-bake-sale"
+  ]
+}

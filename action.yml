@@ -1,5 +1,5 @@
 name: Quest Log
-description: Validates a Quest Log data repo on every PR and push, and sends its push notifications, with the rules from the live Quest Log core.
+description: Validates a Quest Log data repo on every PR and push, sends its push notifications, and reads its photos, with the rules from the live Quest Log core.
 author: lilmuckers
 branding:
   icon: flag
@@ -7,9 +7,12 @@ branding:
 
 inputs:
   token:
-    description: Token for check runs and PR comments. Needs checks and pull-requests write.
+    description: Token for check runs, PR comments and saving what was read from a photo. Needs checks, pull-requests and contents write.
     required: false
     default: ${{ github.token }}
+  anthropic-api-key:
+    description: Claude API key, for a repo whose photos are read by Claude. An input and not step env, so only the step that calls Claude can see it.
+    required: false
 
 outputs:
   core-version:
@@ -24,6 +27,9 @@ runs:
       with:
         ref: ${{ github.event.pull_request.head.sha || github.sha }}
         fetch-depth: 0
+        # Later steps call the API with their own token. Nothing should find one in .git/config,
+        # least of all the reader's model code.
+        persist-credentials: false
 
     # No automatic npm cache: it would land in the user's Actions cache.
     - uses: actions/setup-node@v7
@@ -79,6 +85,49 @@ runs:
         key: quest-notify-${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: quest-notify-
 
+    # Another run can be queued behind this one with the same labels in its event. Reading the live
+    # ones stops it reading the photo again, which with Claude would be charged twice.
+    - name: Check the photo is still waiting
+      id: waiting
+      if: github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'quest:read-auto') || contains(github.event.pull_request.labels.*.name, 'quest:read-claude')) && github.event.pull_request.head.repo.full_name == github.repository
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        QUEST_PR: ${{ github.event.pull_request.number }}
+        QUEST_REPO: ${{ github.repository }}
+      run: |
+        read=true
+        if labels="$(gh api "repos/$QUEST_REPO/issues/$QUEST_PR/labels" --jq '.[].name')"; then
+          grep -qxE 'quest:read-(auto|claude)' <<<"$labels" || read=false
+        fi
+        echo "read=$read" >> "$GITHUB_OUTPUT"
+
+    # Open-weight models on a photo: no token or secret in this step, and any failure just hands
+    # the photo to an agent. The last step saves the result.
+    - name: Read the photo
+      if: steps.waiting.outputs.read == 'true' && contains(github.event.pull_request.labels.*.name, 'quest:read-auto')
+      continue-on-error: true
+      shell: bash
+      env:
+        QUEST_VAPID_PRIVATE_KEY: ''
+        QUEST_PHOTO_REF: ${{ github.head_ref }}
+        QUEST_READ_OUT: ${{ runner.temp }}/quest-read
+      run: bash "${{ github.action_path }}/reader/run.sh"
+
+    # One Claude API call: the key is here and nowhere else, with no GitHub token, no tools and only
+    # JSON back. The last step saves the result, so words in a photo can't reach anything with write
+    # access. Any failure leaves the photo for the person.
+    - name: Read the photo with Claude
+      if: steps.waiting.outputs.read == 'true' && contains(github.event.pull_request.labels.*.name, 'quest:read-claude')
+      continue-on-error: true
+      shell: bash
+      env:
+        QUEST_VAPID_PRIVATE_KEY: ''
+        QUEST_CLAUDE_KEY: ${{ inputs.anthropic-api-key }}
+        QUEST_PHOTO_REF: ${{ github.head_ref }}
+        QUEST_READ_OUT: ${{ runner.temp }}/quest-read
+      run: node "${{ github.action_path }}/dist/claude.mjs"
+
     - name: Quest Log
       id: quest
       shell: bash
@@ -88,6 +137,8 @@ runs:
         QUEST_CORE_VERSION: ${{ steps.pointer.outputs.version }}
         QUEST_STATUS_DIR: ${{ runner.temp }}/quest-status
         QUEST_NOTIFY_STATE: ${{ runner.temp }}/quest-notify/state.json
+        QUEST_READ_OUT: ${{ runner.temp }}/quest-read
+        QUEST_READ_WAITING: ${{ steps.waiting.outputs.read || 'false' }}
       run: node "${{ github.action_path }}/dist/index.mjs"
 
     # always(): pushes already sent must stay recorded even when validate fails the job.

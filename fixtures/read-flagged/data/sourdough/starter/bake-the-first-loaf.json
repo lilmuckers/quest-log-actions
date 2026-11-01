@@ -1,0 +1,48 @@
+{
+  "$schema": "https://tasks.patrick-mckinley.com/schema/level.schema.json",
+  "id": "bake-the-first-loaf",
+  "name": "Bake the first loaf",
+  "deliverable": "One edible sourdough loaf",
+  "timeboxDays": 3,
+  "startedAt": "2025-08-16T16:08:00Z",
+  "clearedAt": "2025-08-18T20:59:00Z",
+  "successCriteria": [
+    {
+      "id": "rose-at-all",
+      "mvp": true,
+      "text": "Rose at all",
+      "done": true,
+      "doneAt": "2025-08-18T20:13:00Z"
+    },
+    {
+      "id": "edible",
+      "mvp": true,
+      "text": "Edible",
+      "done": true,
+      "doneAt": "2025-08-18T20:59:00Z"
+    }
+  ],
+  "items": [
+    {
+      "id": "follow-one-recipe-exactly",
+      "title": "Follow one recipe exactly",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-08-17T12:02:00Z"
+    },
+    {
+      "id": "bake-it",
+      "title": "Bake it",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-08-17T12:50:00Z"
+    },
+    {
+      "id": "eat-it-anyway",
+      "title": "Eat it anyway",
+      "type": "task",
+      "status": "done",
+      "doneAt": "2025-08-18T20:39:00Z"
+    }
+  ]
+}

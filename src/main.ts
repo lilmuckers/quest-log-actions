@@ -11,6 +11,7 @@ import * as quest from './core.js';
 import { checkConclusion, createCheckRun, upsertComment, type Annotation } from './github.js';
 import { loadState, pruneState, runNotify, saveState, type NotifyOutcome, type PrContext, type Sender } from './modules/notify.js';
 import { CHECK_NAME, COMMENT_MARKER, runValidate, type ValidateOutcome } from './modules/validate.js';
+import { READ_CLAUDE_LABEL, runRead, type ReadOutcome } from './modules/read.js';
 import { plan as makePlan, type Plan } from './plan.js';
 import { readSecrets } from './secrets.js';
 import { newStatus, writeStatus, type QuestStatus } from './status.js';
@@ -28,6 +29,8 @@ interface Env {
   baseRefOverride?: string;
   /** Dedup state file, restored from and saved to the Actions cache on scheduled and dispatch runs. */
   notifyState: string;
+  /** Where the reader step left what it found in a photo. */
+  readOut: string;
   /** The run time `quest.py timers` works at (QUEST_NOW overrides it for fixtures). */
   now: Date;
 }
@@ -50,6 +53,7 @@ function readEnv(): Env {
     dryRunOut: process.env.QUEST_DRY_RUN_OUT || undefined,
     baseRefOverride: process.env.QUEST_BASE_REF || undefined,
     notifyState: process.env.QUEST_NOTIFY_STATE || join(process.env.RUNNER_TEMP ?? '/tmp', 'quest-notify', 'state.json'),
+    readOut: process.env.QUEST_READ_OUT || join(process.env.RUNNER_TEMP ?? '/tmp', 'quest-read'),
     now: process.env.QUEST_NOW ? new Date(process.env.QUEST_NOW) : new Date(),
   };
 }
@@ -60,7 +64,7 @@ function writer(env: Env) {
     const out = env.dryRunOut;
     const record = (kind: string, data: unknown) => appendFileSync(out, JSON.stringify({ kind, data }) + '\n');
     return {
-      checkRun: async (run: object) => record('checkRun', run),
+      checkRun: async (run: object, sha?: string) => record('checkRun', { ...run, ...(sha ? { headSha: sha } : {}) }),
       comment: async (body: string) => (record('comment', body), 'dry-run'),
       previousConclusion: async (): Promise<string | undefined> => undefined,
       // Endpoints ending in /gone answer 410, so fixtures can check expiredDevices.
@@ -75,8 +79,8 @@ function writer(env: Env) {
   const repo = github.context.repo;
   const headSha = env.payload.pull_request?.head?.sha ?? github.context.sha;
   return {
-    checkRun: async (run: { conclusion: 'success' | 'failure'; title: string; summary: string; annotations: Annotation[] }) => {
-      await createCheckRun(octokit, repo, { name: CHECK_NAME, headSha, ...run });
+    checkRun: async (run: { conclusion: 'success' | 'failure'; title: string; summary: string; annotations: Annotation[] }, sha = headSha) => {
+      await createCheckRun(octokit, repo, { name: CHECK_NAME, headSha: sha, ...run });
     },
     comment: (body: string) => upsertComment(octokit, repo, env.payload.pull_request.number, COMMENT_MARKER, body),
     previousConclusion: () => checkConclusion(octokit, repo, env.payload.before, CHECK_NAME),
@@ -114,7 +118,7 @@ async function prContext(env: Env, validate: ValidateOutcome | undefined, previo
   };
 }
 
-async function jobSummary(p: Plan, status: QuestStatus, validate?: ValidateOutcome, notify?: NotifyOutcome) {
+async function jobSummary(p: Plan, status: QuestStatus, validate?: ValidateOutcome, notify?: NotifyOutcome, read?: ReadOutcome) {
   const rows = p.modules.map((m) => [m.name, status.modules[m.name]?.ran ? 'ran' : 'skipped', status.modules[m.name]?.reason ?? m.reason]);
   core.summary
     .addHeading('Quest Log', 2)
@@ -133,6 +137,7 @@ async function jobSummary(p: Plan, status: QuestStatus, validate?: ValidateOutco
     core.summary.addRaw(`Push: ${sent} sent, ${notify.deduped} already sent before, ${notify.failed} failed`, true);
     if (notify.expiredDevices.length) core.summary.addRaw(`⚠ Stopped receiving pushes: ${notify.expiredDevices.join(', ')}`, true);
   }
+  if (read) core.summary.addRaw(`Photo: ${read.result}${read.why ? ` (${read.why})` : ''}`, true);
   await core.summary.write();
 }
 
@@ -146,7 +151,10 @@ export async function run(): Promise<void> {
 
     const loaded = loadConfig(env.workspace);
     if (loaded.error) core.warning(loaded.error);
-    const p = makePlan(env.event, loaded.config);
+    const labels = (env.payload.pull_request?.labels ?? []).map((l: { name?: string }) => l.name ?? '');
+    // The event's labels can be stale: a second run queued behind the first still lists them. The
+    // step before the reader looks at the live ones, so a photo is never read and charged for twice.
+    const p = makePlan(env.event, loaded.config, process.env.QUEST_READ_WAITING === 'false' ? [] : labels);
     status = newStatus(env.event, env.coreVersion, p);
     for (const m of p.modules) core.info(`${m.name}: ${m.run ? 'runs' : 'skipped'} (${m.reason})`);
 
@@ -207,7 +215,38 @@ export async function run(): Promise<void> {
       for (const id of notify.expiredDevices) core.warning(`Device ${id} stopped receiving pushes (404/410). Remove it in Settings → Automation.`);
     }
 
-    await jobSummary(p, status, validate, notify);
+    let read: ReadOutcome | undefined;
+    if (p.modules.find((m) => m.name === 'read')?.run) {
+      const e = env;
+      const pull = { repo: process.env.GITHUB_REPOSITORY ?? '', pr: e.payload.pull_request.number as number, token: e.token };
+      const claude = labels.includes(READ_CLAUDE_LABEL);
+      read = runRead({
+        outDir: e.readOut,
+        reader: claude ? 'Claude' : 'the open models',
+        save: (file, model, flag) => {
+          if (e.dryRunOut) {
+            appendFileSync(e.dryRunOut, JSON.stringify({ kind: 'read', data: { read: JSON.parse(readFileSync(file, 'utf8')), mode: claude ? 'claude' : 'open-weight', model, flag } }) + '\n');
+            return { sha: 'dry-run-sha' };
+          }
+          return quest.photoSave(coreRef, pull, file, claude ? 'claude' : 'open-weight', model, flag);
+        },
+        handOver: (note) => {
+          if (e.dryRunOut) appendFileSync(e.dryRunOut, JSON.stringify({ kind: 'handOver', data: note, ...(claude && { gaveUp: true }) }) + '\n');
+          else if (claude) quest.photoGiveUp(coreRef, pull, note);
+          else quest.photoFlag(coreRef, pull, note);
+        },
+        warn: (m) => core.warning(m),
+      });
+      status.modules.read = { ran: true, reason: status.modules.read!.reason, ok: read.result !== 'handed-over', detail: { result: read.result, ...(read.why ? { why: read.why } : {}) } };
+      // The token's commit starts no new run. Only the sidecar changed, and photo-save validated
+      // it, so the new head carries this run's result rather than showing no checks at all.
+      if (read.sha && validate) {
+        const conclusion = validate.ok ? 'success' : 'failure';
+        await w.checkRun({ conclusion, title: validate.ok ? 'Quest data is valid' : 'Quest data has problems', summary: 'Carried over from the commit before: this one only records what was read from the photo.', annotations: [] }, read.sha);
+      }
+    }
+
+    await jobSummary(p, status, validate, notify, read);
     if (validate && !validate.ok) core.setFailed(`${validate.issues} issue(s) in the quest data. See the ${CHECK_NAME} check.`);
   } catch (e) {
     const message = (e as Error).message;

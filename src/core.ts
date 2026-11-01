@@ -26,6 +26,39 @@ export interface Core {
 
 export class CoreFailed extends Error {}
 
+/** Where a photo's pull request lives, for the commands that write to it. */
+export interface PhotoPull {
+  repo: string;
+  pr: number;
+  token: string;
+}
+
+/** Runs a photo command with the token, which only these commands get. */
+function photoCommand(core: Core, pull: PhotoPull, args: string[]) {
+  const r = spawnSync('python3', [join(core.dir, 'quest.py'), '--schemas', join(core.dir, 'schema'), ...args, '--repo', pull.repo, '--pr', String(pull.pr)], {
+    encoding: 'utf8',
+    env: { ...process.env, QUEST_SITE: 'http://127.0.0.1:9/', GITHUB_TOKEN: pull.token },
+  });
+  if (r.status !== 0) throw new CoreFailed(`quest.py ${args[0]} exited ${r.status}: ${(r.stderr || r.stdout).trim()}`);
+  return r.stdout;
+}
+
+/** Saves a read to the photo's sidecar. Returns the new head commit. */
+export function photoSave(core: Core, pull: PhotoPull, file: string, mode: 'open-weight' | 'claude', model: string | undefined, flag: boolean): { sha: string } {
+  const out = photoCommand(core, pull, ['photo-save', '--read', file, '--mode', mode, '--json', ...(model ? ['--model', model] : []), ...(flag ? ['--flag'] : [])]);
+  return { sha: JSON.parse(out).sha };
+}
+
+/** Leaves the photo for an agent, with nothing saved. */
+export function photoFlag(core: Core, pull: PhotoPull, note: string): void {
+  photoCommand(core, pull, ['photo-flag', '--note', note]);
+}
+
+/** Marks the photo as unreadable, for the person to describe. */
+export function photoGiveUp(core: Core, pull: PhotoPull, note: string): void {
+  photoCommand(core, pull, ['photo-give-up', '--note', note]);
+}
+
 type Run = (args: string[]) => { status: number | null; stdout: string; stderr: string };
 
 const defaultRun = (core: Core): Run => (args) => {
