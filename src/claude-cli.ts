@@ -31,7 +31,8 @@ async function main(): Promise<ReadResult> {
   if (!key) return { error: 'the repo has no ANTHROPIC_API_KEY secret, or its workflow needs updating. See Settings → Automation.' };
   const photo = findPhoto(process.env.QUEST_PHOTO_REF ?? '');
   if (!photo) return { error: 'no photo that Claude can read was found on this branch.' };
-  return readPhoto(new Anthropic({ apiKey: key, timeout: 5 * 60 * 1000 }), photo, chooseModel(configuredModel()), console.log);
+  // Three tries at most (the SDK's default), well inside the job's 15 minutes.
+  return readPhoto(new Anthropic({ apiKey: key, timeout: 3 * 60 * 1000 }), photo, chooseModel(configuredModel()), console.log);
 }
 
 const out = process.env.QUEST_READ_OUT!;

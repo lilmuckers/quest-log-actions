@@ -120,7 +120,6 @@ runs:
     - name: Read the photo with Claude
       if: steps.waiting.outputs.read == 'true' && contains(github.event.pull_request.labels.*.name, 'quest:read-claude')
       continue-on-error: true
-      timeout-minutes: 12
       shell: bash
       env:
         QUEST_VAPID_PRIVATE_KEY: ''
